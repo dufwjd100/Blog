@@ -1,0 +1,1918 @@
+/*************************************************
+ * 기간 요약 블로그 자동화 (v9.0 Integrated + 사진태깅)
+ * - v8.0 안정 버전 위에 사진태깅 탭 연동 통합
+ * - 사진 선택은 사진태깅 탭 우선, 후보 없으면 Drive 폴더 폴백
+ * - 선택 사진은 블로그용사진 폴더에 복사
+ * - 글 생성 모델은 Claude API 사용
+ **************************************************/
+
+/* ========= CONFIG ========= */
+const CONFIG = {
+  ANYANG: {
+    branchKey: 'ANYANG',
+    city: '안양',
+    sourceSpreadsheetId: '1QOp8T83xyyBHt_BU3RAbytcqeVrEuHB3nED6zeLw_d4',
+    sourceSheetName: '출석부',
+    sheetId: '1SS74VANMD6Kxw2qNjrqEHTDhSRMRuF0wi9AQoqYa8Ac',
+    targetSheetName: '안양_v8',
+    imageRootFolderId: '1knpnO4MJGNaCEz7pNEOe02yLGq1mG13b',
+    headerRow: 1,
+    timezone: 'Asia/Seoul',
+    platformDefault: '네이버블로그',
+    scheduleDefault: '',
+    model: 'claude-sonnet-4-5',
+    temperature: 0.75,
+    max_tokens: 1800,
+    partRotation: ['기타', '베이스기타', '드럼', '피아노'],
+    localLabels: ['비산동 ', '평촌 ', '범계 ', '관양동 ', '호계동 ', '인덕원 '],
+    cityHashtags: [
+      '#안양실용음악학원', '#안양입시음악학원', '#안양음악학원',
+      '#평촌실용음악', '#범계실용음악', '#관양실용음악', '#호계실용음악', '#비산실용음악',
+      '#평촌드럼학원', '#범계드럼학원', '#관양동드럼학원', '#호계동드럼학원', '#비산동드럼학원'
+    ],
+    trialCTA: {
+      mapUrl: 'https://naver.me/58NiByBR',
+      kakaoUrl: 'https://pf.kakao.com/_ESscxj',
+      phone: '0507-1306-6508',
+      address: '경기 안양시 동안구 관악대로 91 대림타워 801호',
+      booking: {
+        '피아노': 'https://m.booking.naver.com/booking/10/bizes/876672/items/5018128?theme=place&service-target=map-pc&lang=ko&area=bmp&map-search=1',
+        '드럼': 'https://m.booking.naver.com/booking/10/bizes/876672/items/5018095?theme=place&service-target=map-pc&lang=ko&area=bmp&map-search=1',
+        '기타': 'https://m.booking.naver.com/booking/10/bizes/876672/items/5097730?theme=place&service-target=map-pc&lang=ko&area=bmp&map-search=1',
+        '베이스기타': 'https://m.booking.naver.com/booking/10/bizes/876672/items/5097730?theme=place&service-target=map-pc&lang=ko&area=bmp&map-search=1'
+      }
+    }
+  },
+  SUWON: {
+    branchKey: 'SUWON',
+    city: '수원',
+    sourceSpreadsheetId: '1QHrIr76dBf49rDWrN2I5IVaZgAZSi8tAScNRW0SRxt4',
+    sourceSheetName: '출석부',
+    sheetId: '1SS74VANMD6Kxw2qNjrqEHTDhSRMRuF0wi9AQoqYa8Ac',
+    targetSheetName: '수원_v8',
+    imageRootFolderId: '1knpnO4MJGNaCEz7pNEOe02yLGq1mG13b',
+    headerRow: 1,
+    timezone: 'Asia/Seoul',
+    platformDefault: '네이버블로그',
+    scheduleDefault: '',
+    model: 'claude-sonnet-4-5',
+    temperature: 0.75,
+    max_tokens: 1800,
+    partRotation: ['기타', '베이스기타', '드럼', '피아노', '보컬', '작곡', '미디'],
+    localLabels: ['수원 ', '영통 ', '매탄동 ', '권선동 ', '인계동 ', '세류동 ', '광교 ', '매교동 ', '매탄권선역 ', '영통구청 '],
+    cityHashtags: [
+      '#매탄동실용음악학원', '#영통실용음악학원', '#영통구청실용음악학원',
+      '#권선동실용음악학원', '#인계동실용음악학원', '#세류동실용음악학원', '#광교실용음악학원', '#매교동실용음악학원'
+    ],
+    trialCTA: {
+      mapUrl: 'https://naver.me/GnRiX1Ko',
+      kakaoUrl: 'https://pf.kakao.com/_ESscxj',
+      phone: '0507-1418-6659',
+      address: '경기도 수원시 영통구 효원로 383 매탄프라자 7층 701호',
+      booking: {
+        '보컬': 'https://m.booking.naver.com/booking/10/bizes/1236008/items/6191103?theme=place&service-target=map-pc&lang=ko&area=bmp&map-search=1',
+        '기타': 'https://m.booking.naver.com/booking/10/bizes/1236008/items/6191103?theme=place&service-target=map-pc&lang=ko&area=bmp&map-search=1',
+        '베이스기타': 'https://m.booking.naver.com/booking/10/bizes/1236008/items/6191103?theme=place&service-target=map-pc&lang=ko&area=bmp&map-search=1',
+        '드럼': 'https://m.booking.naver.com/booking/10/bizes/1236008/items/6191103?theme=place&service-target=map-pc&lang=ko&area=bmp&map-search=1',
+        '피아노': 'https://m.booking.naver.com/booking/10/bizes/1236008/items/6191103?theme=place&service-target=map-pc&lang=ko&area=bmp&map-search=1',
+        '작곡': 'https://m.booking.naver.com/booking/10/bizes/1236008/items/6191103?theme=place&service-target=map-pc&lang=ko&area=bmp&map-search=1',
+        '미디': 'https://m.booking.naver.com/booking/10/bizes/1236008/items/6191103?theme=place&service-target=map-pc&lang=ko&area=bmp&map-search=1'
+      }
+    }
+  }
+};
+
+const DOC_STYLE = {
+  fontHeading: 'Nanum Myeongjo',
+  fontBody: 'Noto Sans KR',
+  colorHeading: '#6B4226',
+  colorAccent: '#B5612E',
+  colorBody: '#3D3128',
+  sizeH1: 22,
+  sizeH2: 16,
+  sizeBody: 11
+};
+
+const DOC_EXPORT_MODE = 'LINK_ONLY';
+
+/* ========= MENU ========= */
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('블로그 자동화(v9.0)')
+    .addItem('안양 기간 요약 글 생성', 'menuRunAnyang')
+    .addItem('수원 기간 요약 글 생성', 'menuRunSuwon')
+    .addSeparator()
+    .addItem('선택한 행을 Google Docs로 내보내기', 'menuExportSelectedToDocs')
+    .addSeparator()
+    .addItem('Claude 키 설정', 'run_setClaudeKey')
+    .addToUi();
+}
+
+function menuRunAnyang() { menuGenerateByBranch_('ANYANG'); }
+function menuRunSuwon() { menuGenerateByBranch_('SUWON'); }
+function runAnyang() { generatePeriodSummaries_('ANYANG', '', '', ''); }
+function runSuwon() { generatePeriodSummaries_('SUWON', '', '', ''); }
+
+function menuGenerateByBranch_(branchKey) {
+  const ui = SpreadsheetApp.getUi();
+  const s = ui.prompt('시작일 (예: 2025-10-01, 비우면 자동)').getResponseText().trim();
+  const e = ui.prompt('종료일 (예: 2025-10-31, 비우면 자동)').getResponseText().trim();
+  const p = ui.prompt('파트 필터(비우면 로테이션 자동)').getResponseText().trim();
+  generatePeriodSummaries_(branchKey, s, e, p);
+}
+
+/* ========= CLAUDE KEY ========= */
+function run_setClaudeKey() { setClaudeKey_(); }
+function run_setOpenAIKey() { setClaudeKey_(); }
+
+function setClaudeKey_() {
+  const ui = SpreadsheetApp.getUi();
+  const resp = ui.prompt('Anthropic Claude API Key (sk-ant- 로 시작):').getResponseText().trim();
+  if (!/^sk-ant-/.test(resp)) {
+    ui.alert('❗ 키 형식이 올바르지 않습니다.');
+    return;
+  }
+  PropertiesService.getScriptProperties().setProperty('ANTHROPIC_API_KEY', resp);
+  ui.alert('✅ Claude API Key 저장 완료');
+}
+
+function getClaudeKey_() {
+  const key = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+  if (!key) throw new Error('ANTHROPIC_API_KEY가 설정되지 않았습니다.');
+  return key;
+}
+
+/* ========= MAIN ========= */
+function generatePeriodSummaries_(branchKey, startStr, endStr, partFilter) {
+  const cfg = getCfg_(branchKey);
+
+  const srcSS = openSourceSpreadsheet_(cfg);
+  const src = srcSS.getSheetByName(cfg.sourceSheetName);
+  if (!src) throw new Error(`소스 시트(${cfg.sourceSheetName})가 없습니다.`);
+
+  const dstSS = SpreadsheetApp.openById(cfg.sheetId);
+  let dst = dstSS.getSheetByName(cfg.targetSheetName);
+  if (!dst) dst = dstSS.insertSheet(cfg.targetSheetName);
+  ensureTargetHeader_(dst);
+
+  const lastRow = src.getLastRow();
+  const lastCol = src.getLastColumn();
+  if (lastRow < cfg.headerRow) {
+    safeNotify_('출석부에 데이터가 없습니다.');
+    return;
+  }
+
+  const data = src.getRange(cfg.headerRow, 1, lastRow - cfg.headerRow + 1, lastCol).getValues();
+  if (data.length < 2) {
+    safeNotify_('출석부 데이터가 부족합니다.');
+    return;
+  }
+
+  const header = data[0].map(String);
+  const rows = data.slice(1);
+  const col = buildColumnIndex_(header);
+  const tz = cfg.timezone;
+
+  let start, end;
+  if (startStr && endStr) {
+    start = parseDate_(startStr, tz, '시작일 형식은 YYYY-MM-DD');
+    end = parseDate_(endStr, tz, '종료일 형식은 YYYY-MM-DD');
+  } else {
+    const inferred = inferPeriodAuto_(rows, col, tz);
+    start = inferred.start;
+    end = inferred.end;
+  }
+
+  const endPlus = addDays_(end, 1);
+  const manualPart = Boolean(partFilter && partFilter.trim());
+  let selectedPart = manualPart ? normalizePart_(partFilter.trim()) : '';
+  let pack = null;
+
+  if (manualPart) {
+    pack = collectLessonPackForPart_(cfg, rows, col, selectedPart, start, endPlus);
+    if (!pack || !pack.text.length) {
+      Logger.log(`수동 파트(${selectedPart}) 해당 기간 글감 없음 → 최근 기록으로 폴백`);
+      pack = collectRecentLessonPackForPart_(cfg, rows, col, selectedPart, 12);
+    }
+  } else {
+    for (let i = 0; i < cfg.partRotation.length; i++) {
+      const candidatePart = getNextPartRotation_(cfg);
+      const candidatePack = collectLessonPackForPart_(cfg, rows, col, candidatePart, start, endPlus);
+      if (candidatePack.text.length) {
+        selectedPart = candidatePart;
+        pack = candidatePack;
+        break;
+      }
+      Logger.log(`글감 없음: ${cfg.city} ${candidatePart} → 다음 파트 시도`);
+    }
+  }
+
+  if (!pack || !pack.text.length) {
+    if (manualPart) safeNotify_(`선택된 파트(${selectedPart})에 해당 기간 글감이 없습니다.`);
+    else Logger.log(`${cfg.city}: 전체 파트 로테이션을 확인했지만 해당 기간 글감이 없습니다.`);
+    return;
+  }
+
+  const local = pickLocalLabel_(cfg);
+  const target = pickTarget_();
+  const titleType = pickTitleType_();
+  const uniqSongs = [...new Set(pack.songs)].slice(0, 5);
+  const songForTitle = uniqSongs[0] || '';
+  const dateRangeLabel = `${Utilities.formatDate(start, tz, 'yyyy.MM.dd')} ~ ${Utilities.formatDate(end, tz, 'yyyy.MM.dd')}`;
+  const periodLabel = `${Utilities.formatDate(start, tz, 'yyyy.M')}~${Utilities.formatDate(end, tz, 'yyyy.M')}`;
+  const recentFaqs = getRecentFaqs_(dst, 5);
+  const selectedImages = selectTaggedPhotosForPost_(dstSS, cfg, selectedPart, 10);
+
+  const g = generateWithClaude_V9_(cfg, selectedPart, pack.text, {
+    city: cfg.city,
+    localLabel: local,
+    dateRange: dateRangeLabel,
+    songs: uniqSongs,
+    target: target,
+    titleType: titleType,
+    recentFaqs: recentFaqs,
+    photoTags: selectedImages
+  });
+
+  if (!g || !g.title || !g.sections || !Array.isArray(g.faq) || g.faq.length < 3) {
+    appendObjectRows_(dst, [emptyObjectWithError_(selectedPart, start, end, tz, `GPT생성실패: ${(g && g.error) || 'unknown'}`)]);
+    return;
+  }
+
+  const forbiddenNames = [...pack.students, ...pack.teachers].filter(Boolean);
+  const sections = scrubSections_(normalizeSections_(g.sections), forbiddenNames);
+  const faq = scrubFaq_(normalizeFaq_(g.faq).slice(0, 3), forbiddenNames);
+  const studioIntro = getStudioIntro_();
+  const cta = trialCTA_(cfg, selectedPart);
+
+  let body = [
+    sections.intro,
+    sections.body,
+    '[실제 수업 한 장면]',
+    sections.case,
+    '[자주 묻는 질문]',
+    faqToText_(faq),
+    '[학원 소개]',
+    studioIntro,
+    cta
+  ].filter(Boolean).join('\n\n');
+
+  if (body.length < 900 || body.length > 1500) {
+    try { body = resizeBodyWithGPT_(cfg, body, 1200); } catch (e) { Logger.log(e); }
+  }
+  body = scrubKnownNames_(body, forbiddenNames);
+
+  if (isDuplicateAcrossBranches_(body)) {
+    try {
+      body = resizeBodyWithGPT_(cfg, body + '\n\n같은 의미를 유지하면서 문장과 흐름을 완전히 다르게 다시 써줘.', 1200);
+      body = scrubKnownNames_(body, forbiddenNames);
+    } catch (e) {
+      Logger.log('리라이트 실패: ' + e);
+    }
+  }
+
+  const titleTail = titleType === 'KEYWORD'
+    ? cleanupTitle_(g.title, local, selectedPart)
+    : scrubKnownNames_(String(g.title || '').replace(/\s+/g, ' ').trim(), forbiddenNames);
+  const seoTitleFull = buildFinalTitle_(titleType, titleTail, local, selectedPart);
+
+  const tagsArr = buildSeoHashtags_({
+    cfg: cfg,
+    city: cfg.city,
+    part: selectedPart,
+    song: songForTitle,
+    period: periodLabel,
+    localLabel: local.trim()
+  });
+  const tagsLine = tagsArr.join(' ');
+  const tagsCsv = tagsArr.join(',');
+
+  const photoCaps = Array.isArray(g.photo_captions)
+    ? g.photo_captions.slice(0, 10).map(c => scrubKnownNames_(c, forbiddenNames))
+    : [];
+
+  const thumbnailInfo = normalizeThumbnailInfo_(g.thumbnail_info, {
+    title: seoTitleFull,
+    city: cfg.city,
+    part: selectedPart,
+    target: target
+  });
+
+  const uploadFolder = createUploadImageFolder_(cfg, selectedPart, selectedImages, {
+    title: seoTitleFull,
+    date: new Date(),
+    timezone: tz
+  });
+  const photoGuide = buildPhotoRecommendationGuide_(cfg, selectedPart, selectedImages);
+
+  const finalPaste = assembleFinal_({
+    title: seoTitleFull,
+    part: selectedPart,
+    city: cfg.city,
+    localLabel: local,
+    thumbnailInfo: thumbnailInfo,
+    photoGuide: photoGuide,
+    uploadFolder: uploadFolder,
+    sections: sections,
+    faq: faq,
+    studioIntro: studioIntro,
+    cta: cta,
+    photoCaptions: photoCaps,
+    hashtagsLine: tagsLine
+  });
+
+  const row = {
+    'post_id': genPostId_(selectedPart, new Date(), tz),
+    '상태': '생성됨',
+    '발행플랫폼': cfg.platformDefault || '',
+    '발행URL': '',
+    '예약시간': cfg.scheduleDefault || '',
+    '본문(복붙)': finalPaste,
+    '제목': seoTitleFull,
+    '해시태그': tagsCsv,
+    '섹션-도입': sections.intro,
+    '섹션-본문': sections.body,
+    '섹션-사례': sections.case,
+    '섹션-FAQ': faqToText_(faq),
+    'FAQ_JSON': JSON.stringify(faq),
+    '섹션-학원소개': studioIntro,
+    '섹션-CTA': cta,
+    '본문_MD': body,
+    '썸네일_아이디어': scrubKnownNames_(g.thumbnail_idea || '', forbiddenNames),
+    '썸네일_제작정보': thumbnailInfoToText_(thumbnailInfo),
+    '사진추천_조건': photoGuideToText_(photoGuide),
+    '이미지_URLs': selectedImages.map(img => img.url).join(' | '),
+    '업로드용_사진폴더': uploadFolder.url,
+    '업로드용_사진목록': uploadFolder.fileNames.join('\n'),
+    '학생명': '',
+    '수업일': `${Utilities.formatDate(start, tz, 'yyyy-MM-dd')}~${Utilities.formatDate(end, tz, 'yyyy-MM-dd')}`,
+    '파트/악기': selectedPart,
+    '타겟': target,
+    '클래스': '',
+    '강사명': [...pack.teachers].join(', '),
+    '원본행': JSON.stringify(pack.rowNums),
+    '에러로그': '',
+    '사진캡션(CSV)': photoCaps.join(' | ')
+  };
+
+  appendObjectRows_(dst, [row]);
+  markTaggedPhotosUsed_(dstSS, selectedImages, seoTitleFull, tz);
+  safeNotify_(`기간 요약 1건 생성 완료: ${seoTitleFull}`);
+}
+
+/* ========= CLAUDE ========= */
+function generateWithClaude_V9_(cfg, part, textList, meta) {
+  const key = getClaudeKey_();
+  const url = 'https://api.anthropic.com/v1/messages';
+
+  const cleaned = (textList || [])
+    .map(t => String(t || '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  cleaned.sort((a, b) => scoreTeacherLine_(b) - scoreTeacherLine_(a));
+  const seed = cleaned.slice(0, 3).join('\n');
+
+  const titleGuide = [
+    '생성 순서: 1) 출석부/레슨평가에서 수업 핵심 1줄 추출 2) 그 핵심을 검색자가 물을 법한 질문으로 변환 3) 질문형 제목 작성 4) 본문 작성 5) FAQ 작성.',
+    'title은 질문 부분만 작성한다. 예: "직장인 발성 수업은 음역 연결을 어떻게 연습할까요?"',
+    '최종 제목에는 코드가 지역+파트학원 키워드를 앞에 붙이므로 title 안에는 지역명, 동네명, 학원, 레슨을 반복하지 않는다.',
+    '질문은 수업내용에서 나온 실제 패턴을 바탕으로 만든다.'
+  ].join('\n');
+
+  const system = [
+    '너는 실용음악학원 블로그를 쓰는 상업용 카피라이터이자 SEO 에디터다.',
+    '목표: AI와 검색이 인용하기 쉬운 질문형/FAQ형/수업사례형 블로그 글을 꾸준히 생성한다.',
+    '톤: 따뜻하고 담백하게. 과장 없이 정보와 사실을 1~2개 이상 포함한다.',
+    '금지어: 최고, 1등, 무조건, 보장, 100%',
+    '학생/강사의 실명, 성, 이름, 초성, 이니셜, 마스킹명은 제목/본문/FAQ/사진캡션 어디에도 절대 쓰지 않는다.',
+    '학생을 지칭할 때는 반드시 "한 학생", "한 초등학생", "한 성인 수강생", "한 수강생" 같은 비식별 표현만 쓴다.',
+    '여러 출석부 행을 묶은 주간 요약형 글이므로 특정 학생 개인의 후기처럼 쓰지 않는다.',
+    '구성은 반드시 intro/body/case/faq 3개로 만든다. empathy/core/detail/diff/cta 구조를 쓰지 않는다.',
+    'intro는 초보자/학부모/성인 수강생의 걱정으로 시작하는 공감 도입으로 쓴다.',
+    'body에는 "설명만 듣는 수업"보다 "직접 해보고, 다시 확인하고, 조금씩 자기 것으로 만드는 수업"이라는 메시지를 자연스럽게 포함한다.',
+    'case는 추상적 감상보다 수업에서 실제로 무엇을 했는지 중심으로 쓴다.',
+    'case에는 가능한 경우 "느린 템포에서 시작", "원래 템포로 올림", "8마디 연결", "곡 전체 흐름", "리듬과 템포를 나누어 연습" 같은 구체적 행동을 포함한다.',
+    'FAQ 우선순위: 1) 수업내용 기반 질문 2) 학부모/수강생이 실제로 할 만한 질문 3) 일반 검색 질문.',
+    'FAQ는 본문과 연결된 질문만 만들고, 최근 질문 목록과 겹치는 질문은 피한다.',
+    'FAQ 답변은 검색자가 바로 이해할 수 있게 2~4문장으로 쓴다.',
+    '출력은 JSON 객체 1개만 반환한다. JSON 외 텍스트 금지.',
+    `도시: ${meta.city}`,
+    `지역라벨: ${meta.localLabel}`,
+    `파트: ${part}`,
+    `타겟: ${meta.target}`,
+    `기간: ${meta.dateRange}`,
+    titleGuide,
+    buildTargetGuide_(meta.target),
+    buildFaqCategoryGuide_(part)
+  ].join('\n');
+
+  const userPrompt = [
+    '아래 수업곡/수업내용/레슨평가/현재진행상태에서 수업 패턴과 정보성 포인트를 뽑아 글을 작성해라.',
+    '먼저 lesson_core에 수업 핵심을 1줄로 추출하고, title은 lesson_core를 질문으로 바꾼 문장으로 작성해라.',
+    '본문 전체에 지역라벨과 도시+파트학원 표현을 자연스럽게 2~4회 포함하라.',
+    '사례 문단은 "성장했다/좋았다"만 쓰지 말고 어떤 연습을 어떤 순서로 했는지 적어라.',
+    'FAQ 3개 중 최소 2개는 수업곡/수업내용/레슨평가/현재진행상태에서 나온 실제 수업 패턴을 질문으로 바꿔라.',
+    '사진 캡션에도 학생명/강사명/초성/이니셜을 쓰지 마라.',
+    '',
+    '최근 5개 글 FAQ. 이 질문들은 피할 것:',
+    (meta.recentFaqs || []).map(q => `- ${q}`).join('\n') || '- 없음',
+    '',
+    '이번 글에 사용할 사진태깅 참고 정보:',
+    formatPhotoTagsForPrompt_(meta.photoTags),
+    '',
+    '사진 캡션, 썸네일 배경 추천, 본문 사진 추천 문구는 반드시 위 사진태깅 정보의 사진유형/핵심내용/추천_글내위치/비고를 참고해서 작성하라.',
+    '사진유형은 블로그에서의 배치 역할로 보고, 핵심내용과 파일명해석은 실제 사진 내용으로 함께 참고하라.',
+    '사진 속 인물의 이름이나 특정 학생을 추정하는 표현은 쓰지 마라.',
+    '',
+    '수업곡/수업내용/레슨평가/현재진행상태 발췌:',
+    seed,
+    '',
+    '반드시 다음 JSON 구조로 반환:',
+    JSON.stringify({
+      lesson_core: '수업 핵심 1줄',
+      title: '...',
+      sections: {
+        intro: '공감 도입 문단',
+        body: '초보자의 고민과 동경하다 수업 방식 설명 문단',
+        case: '구체적인 수업 행동 중심의 실제 수업 한 장면 문단'
+      },
+      faq: [
+        { q: '질문 1', a: '답변 1' },
+        { q: '질문 2', a: '답변 2' },
+        { q: '질문 3', a: '답변 3' }
+      ],
+      photo_captions: ['사진 1 캡션','사진 2 캡션','사진 3 캡션','사진 4 캡션','사진 5 캡션','사진 6 캡션','사진 7 캡션','사진 8 캡션','사진 9 캡션','사진 10 캡션'],
+      thumbnail_idea: '...',
+      thumbnail_info: {
+        template_type: 'Q&A형',
+        background_photo: '악기/수업/공간 사진 추천',
+        title_main: '메인 문구',
+        title_sub: '서브 문구',
+        brand_name: '음악실 동경하다',
+        tone: '따뜻함, 차분함, 초보자 친화'
+      }
+    })
+  ].join('\n');
+
+  const payload = {
+    model: cfg.model,
+    temperature: cfg.temperature,
+    max_tokens: cfg.max_tokens,
+    system: system,
+    messages: [
+      { role: 'user', content: userPrompt }
+    ]
+  };
+
+  const res = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01'
+    },
+    muteHttpExceptions: true,
+    payload: JSON.stringify(payload)
+  });
+
+  const code = res.getResponseCode();
+  if (code < 200 || code >= 300) {
+    return { error: `HTTP ${code}: ${(res.getContentText() || '').slice(0, 600)}` };
+  }
+
+  const json = JSON.parse(res.getContentText());
+  const raw = extractClaudeText_(json).trim();
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    return { error: 'JSON 파싱 실패: ' + e + ' / raw: ' + raw.slice(0, 300) };
+  }
+}
+
+function generateWithGPT_V9_(cfg, part, textList, meta) {
+  return generateWithClaude_V9_(cfg, part, textList, meta);
+}
+
+function generateWithGPT_V8_(cfg, part, textList, meta) {
+  return generateWithClaude_V9_(cfg, part, textList, meta);
+}
+
+function extractClaudeText_(json) {
+  const content = json && Array.isArray(json.content) ? json.content : [];
+  return content
+    .map(block => {
+      if (!block) return '';
+      if (block.type === 'text') return String(block.text || '');
+      return '';
+    })
+    .join('\n')
+    .trim();
+}
+
+/* ========= TITLE / FAQ / INTRO ========= */
+function pickTitleType_() {
+  return 'QUESTION';
+}
+
+function buildFinalTitle_(titleType, titleTail, local, part) {
+  const localClean = String(local || '').trim();
+  const partClean = String(part || '').trim();
+  const prefix = `${localClean} ${partClean}학원`.replace(/\s+/g, ' ').trim();
+  let tail = cleanupTitle_(titleTail, localClean, partClean);
+
+  if (titleType === 'QUESTION') {
+    tail = tail.replace(/[?？]*$/, '').trim();
+    return `${prefix}, ${tail}?`.replace(/\s+/g, ' ').trim();
+  }
+
+  return `${prefix} ${tail}`.replace(/\s+/g, ' ').trim();
+}
+
+function buildFaqCategoryGuide_(part) {
+  const p = normalizePart_(part);
+  const map = {
+    '드럼': 'FAQ 후보 범주: 시작연령, 층간소음, 드럼세트, 기본기, 곡 시작 시기',
+    '기타': 'FAQ 후보 범주: 통기타와 일렉기타 차이, 손가락 통증, 코드, 곡 시작 시기, 독학 비교',
+    '베이스기타': 'FAQ 후보 범주: 기타와 차이, 시작 시기, 합주, 곡 시작 시기',
+    '피아노': 'FAQ 후보 범주: 시작 연령, 클래식과 실용 차이, 손가락, 곡 시작 시기, 성인 가능',
+    '보컬': 'FAQ 후보 범주: 음치, 발성, 곡 선정, 변성기, 호흡',
+    '작곡': 'FAQ 후보 범주: 시작 시기, 장비, DAW, 화성학',
+    '미디': 'FAQ 후보 범주: 시작 시기, 장비, DAW, 화성학'
+  };
+  return map[p] || 'FAQ 후보 범주: 시작 시기, 준비물, 기초, 곡 시작 시기, 수업 방식';
+}
+
+function getRecentFaqs_(dst, limit) {
+  try {
+    const headerMap = getHeaderMap_(dst);
+    const faqCol = headerMap['FAQ_JSON'];
+    if (!faqCol || dst.getLastRow() < 2) return [];
+
+    const n = Math.min(limit || 5, dst.getLastRow() - 1);
+    const start = Math.max(2, dst.getLastRow() - n + 1);
+    const values = dst.getRange(start, faqCol, n, 1).getValues();
+    const out = [];
+    values.forEach(row => {
+      const raw = String(row[0] || '').trim();
+      if (!raw) return;
+      try {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) arr.forEach(x => { if (x && x.q) out.push(String(x.q)); });
+      } catch (e) {}
+    });
+    return out.slice(-15);
+  } catch (e) {
+    Logger.log(e);
+    return [];
+  }
+}
+
+function getStudioIntro_() {
+  return [
+    '음악실 동경하다는 수원 영통구와 안양 동안구에서 운영하는 실용음악학원입니다.',
+    '드럼, 기타, 보컬, 피아노, 베이스, 작곡 수업을 운영하며',
+    '초등학생부터 성인까지 개인의 목적과 속도에 맞춘 수업을 진행합니다.'
+  ].join('\n');
+}
+
+function normalizeSections_(sections) {
+  return {
+    intro: String(sections.intro || '').trim(),
+    body: String(sections.body || '').trim(),
+    case: String(sections.case || '').trim()
+  };
+}
+
+function normalizeFaq_(faq) {
+  return (faq || []).map(item => ({
+    q: String(item.q || item.question || '').trim(),
+    a: String(item.a || item.answer || '').trim()
+  })).filter(item => item.q && item.a);
+}
+
+function scrubSections_(sections, names) {
+  return {
+    intro: scrubKnownNames_(sections.intro, names),
+    body: scrubKnownNames_(sections.body, names),
+    case: scrubKnownNames_(sections.case, names)
+  };
+}
+
+function scrubFaq_(faq, names) {
+  return (faq || []).map(item => ({
+    q: scrubKnownNames_(item.q, names),
+    a: scrubKnownNames_(item.a, names)
+  })).filter(item => item.q && item.a);
+}
+
+function scrubKnownNames_(text, names) {
+  let t = String(text || '');
+  (names || []).filter(Boolean).forEach(name => {
+    const n = String(name || '').trim();
+    if (!n) return;
+    const escaped = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    t = t.replace(new RegExp(escaped, 'g'), '한 수강생');
+  });
+  t = t.replace(/[가-힣]\s?\*/g, '한 수강생');
+  t = t.replace(/[A-Z]\*/g, '한 수강생');
+  t = t.replace(/[ㄱ-ㅎㅏ-ㅣ]{2,}/g, '한 수강생');
+  return t.replace(/\s{2,}/g, ' ').trim();
+}
+
+function faqToText_(faq) {
+  return (faq || []).map((item, i) => `Q${i + 1}. ${item.q}\nA. ${item.a}`).join('\n\n');
+}
+
+/* ========= BODY / DUPLICATE ========= */
+function resizeBodyWithGPT_(cfg, body, targetChars) {
+  const key = getClaudeKey_();
+  const url = 'https://api.anthropic.com/v1/messages';
+  const target = Math.max(900, Math.min(1500, targetChars | 0));
+
+  const payload = {
+    model: cfg.model,
+    temperature: 0.4,
+    max_tokens: cfg.max_tokens,
+    system: '너는 에디터다. 입력 본문을 같은 톤으로 유지하면서 길이만 조정한다. FAQ, 학원 소개, CTA 구조는 유지한다. 학생명/강사명은 절대 쓰지 않는다.',
+    messages: [
+      { role: 'user', content: `요구 길이: ${target}자 내외 (±120자)\n금지어: 최고, 1등, 무조건, 보장, 100%\n학생 표현: 한 학생, 한 초등학생, 한 성인 수강생처럼 비식별 표현만 사용\n\n원문:\n${body}` }
+    ]
+  };
+
+  const res = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01'
+    },
+    muteHttpExceptions: true,
+    payload: JSON.stringify(payload)
+  });
+
+  if (res.getResponseCode() >= 200 && res.getResponseCode() < 300) {
+    const json = JSON.parse(res.getContentText());
+    return extractClaudeText_(json).trim() || body;
+  }
+  return body;
+}
+
+function isDuplicateAcrossBranches_(newBody) {
+  const ids = unique_([CONFIG.ANYANG.sheetId, CONFIG.SUWON.sheetId]);
+  const branches = ['안양', '수원'];
+  const newHash = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, newBody));
+
+  for (const id of ids) {
+    try {
+      const ss = SpreadsheetApp.openById(id);
+      for (const name of branches) {
+        const sh = ss.getSheetByName(name);
+        if (!sh || sh.getLastRow() < 2) continue;
+        const headerMap = getHeaderMap_(sh);
+        const bodyCol = headerMap['본문_MD'] || 14;
+        const values = sh.getRange(2, bodyCol, sh.getLastRow() - 1, 1).getValues();
+        for (let i = 0; i < values.length; i++) {
+          const existing = String(values[i][0] || '');
+          if (!existing) continue;
+          const oldHash = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, existing));
+          if (newHash === oldHash) return true;
+          if (textSimilarity_(newBody, existing) > 0.7) return true;
+        }
+      }
+    } catch (e) {
+      Logger.log(e);
+    }
+  }
+  return false;
+}
+
+function textSimilarity_(a, b) {
+  const ta = String(a || '').replace(/\s+/g, ' ').split(' ');
+  const tb = String(b || '').replace(/\s+/g, ' ').split(' ');
+  const sa = new Set(ta);
+  const sb = new Set(tb);
+  const inter = [...sa].filter(x => sb.has(x)).length;
+  const union = new Set([...sa, ...sb]).size;
+  return union ? inter / union : 0;
+}
+
+/* ========= SHEET WRITES ========= */
+function HEADER_() {
+  return [
+    'post_id','상태','발행플랫폼','발행URL','예약시간','본문(복붙)','제목','해시태그',
+    '섹션-도입','섹션-본문','섹션-사례','섹션-FAQ','FAQ_JSON','섹션-학원소개','섹션-CTA',
+    '본문_MD','썸네일_아이디어','썸네일_제작정보','사진추천_조건','이미지_URLs',
+    '업로드용_사진폴더','업로드용_사진목록',
+    '학생명','수업일','파트/악기','타겟','클래스','강사명','원본행','에러로그',
+    '사진캡션(CSV)'
+  ];
+}
+
+function ensureTargetHeader_(dst) {
+  const desired = HEADER_();
+  if (dst.getLastRow() === 0) {
+    dst.appendRow(desired);
+    return;
+  }
+
+  const width = Math.max(dst.getLastColumn(), desired.length);
+  const current = dst.getRange(1, 1, 1, width).getValues()[0].map(String);
+  const have = new Set(current.filter(Boolean));
+  const missing = desired.filter(h => !have.has(h));
+
+  if (missing.length) {
+    dst.insertColumnsAfter(dst.getLastColumn(), missing.length);
+    dst.getRange(1, dst.getLastColumn() - missing.length + 1, 1, missing.length).setValues([missing]);
+  }
+}
+
+function appendObjectRows_(sheet, rows) {
+  if (!rows || !rows.length) return;
+  ensureTargetHeader_(sheet);
+  const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  const values = rows.map(obj => header.map(h => Object.prototype.hasOwnProperty.call(obj, h) ? obj[h] : ''));
+  sheet.getRange(sheet.getLastRow() + 1, 1, values.length, header.length).setValues(values);
+}
+
+function getHeaderMap_(sheet) {
+  const lastCol = Math.max(1, sheet.getLastColumn());
+  const header = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(String);
+  const map = {};
+  header.forEach((h, i) => { if (h) map[h] = i + 1; });
+  return map;
+}
+
+function emptyObjectWithError_(part, start, end, tz, errorMsg) {
+  return {
+    'post_id': genPostId_(part, new Date(), tz),
+    '상태': '에러',
+    '제목': `${part} 생성 실패`,
+    '수업일': `${Utilities.formatDate(start, tz, 'yyyy-MM-dd')}~${Utilities.formatDate(end, tz, 'yyyy-MM-dd')}`,
+    '파트/악기': part,
+    '에러로그': String(errorMsg || '')
+  };
+}
+
+/* ========= LESSON DATA ========= */
+function buildColumnIndex_(header) {
+  const find = (name, required) => {
+    let i = header.indexOf(name);
+    if (i === -1) {
+      const trimmed = header.map(h => h.replace(/\s+/g, ''));
+      i = trimmed.indexOf(name.replace(/\s+/g, ''));
+    }
+    if (required && i === -1) throw new Error(`'${name}' 컬럼 없음`);
+    return i;
+  };
+
+  return {
+    cData: find('데이터', false),
+    cDate: find('날짜', true),
+    cAttend: find('출결상황', true),
+    cSong: find('수업곡', false),
+    cNote: find('수업내용', false) >= 0 ? find('수업내용', false) : find('수업내용 ', false),
+    cEval: find('레슨평가', false),
+    cProgress: firstFoundColumn_(find, ['현재진행상태', '현재 진행 상태', '진행상태', '학생진행상태', '현재상태']),
+    cPart: find('수업명', false) >= 0 ? find('수업명', false) : find('수업명 ', false),
+    cTeacher: find('강사명', false),
+    cStudent: find('이름', false) >= 0 ? find('이름', false) : find('수강자명', false)
+  };
+}
+
+function collectLessonPackForPart_(cfg, rows, col, selectedPart, start, endPlus) {
+  const pack = { text: [], songs: [], teachers: new Set(), students: new Set(), rowNums: [] };
+
+  rows.forEach((r, ri) => {
+    try {
+      if (String(r[col.cAttend] ?? '').trim() !== '출석') return;
+
+      const rawDate = r[col.cDate];
+      const dt = rawDate instanceof Date ? rawDate : new Date(rawDate);
+      if (isNaN(dt.getTime())) return;
+      if (!(dt >= start && dt < endPlus)) return;
+
+      const partRaw = col.cPart >= 0 ? String(r[col.cPart] ?? '') : (col.cData >= 0 ? String(r[col.cData] ?? '') : '');
+      const part = normalizePart_(partRaw);
+      if (part !== selectedPart) return;
+
+      const note = col.cNote >= 0 ? String(r[col.cNote] ?? '').trim() : '';
+      const evalTxt = col.cEval >= 0 ? String(r[col.cEval] ?? '').trim() : '';
+      const song = col.cSong >= 0 ? String(r[col.cSong] ?? '').trim() : '';
+      const progress = col.cProgress >= 0 ? String(r[col.cProgress] ?? '').trim() : '';
+      if (!song && !note && !evalTxt && !progress) return;
+
+      const teacher = col.cTeacher >= 0 ? String(r[col.cTeacher] ?? '').trim() : '';
+      const student = col.cStudent >= 0 ? String(r[col.cStudent] ?? '').trim() : '';
+      const merged = buildLessonSeedText_({ song, note, evalTxt, progress }, { studentName: student, teacherName: teacher });
+      if (!merged) return;
+
+      pack.text.push(merged);
+      if (song) pack.songs.push(song);
+      if (teacher) pack.teachers.add(teacher);
+      if (student) pack.students.add(student);
+      pack.rowNums.push(cfg.headerRow + 1 + ri);
+    } catch (e) {
+      Logger.log(e);
+    }
+  });
+
+  return pack;
+}
+
+function collectRecentLessonPackForPart_(cfg, rows, col, selectedPart, limit) {
+  const pack = { text: [], songs: [], teachers: new Set(), students: new Set(), rowNums: [] };
+  const p = normalizePart_(selectedPart);
+
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (pack.text.length >= (limit || 12)) break;
+    const r = rows[i];
+
+    try {
+      const attend = String(r[col.cAttend] ?? '').trim();
+      if (attend && attend !== '출석') continue;
+
+      const partRaw = col.cPart >= 0 ? String(r[col.cPart] ?? '') : (col.cData >= 0 ? String(r[col.cData] ?? '') : '');
+      const part = normalizePart_(partRaw);
+      if (part !== p) continue;
+
+      const note = col.cNote >= 0 ? String(r[col.cNote] ?? '').trim() : '';
+      const evalTxt = col.cEval >= 0 ? String(r[col.cEval] ?? '').trim() : '';
+      const song = col.cSong >= 0 ? String(r[col.cSong] ?? '').trim() : '';
+      const progress = col.cProgress >= 0 ? String(r[col.cProgress] ?? '').trim() : '';
+      const teacher = col.cTeacher >= 0 ? String(r[col.cTeacher] ?? '').trim() : '';
+      const student = col.cStudent >= 0 ? String(r[col.cStudent] ?? '').trim() : '';
+
+      let merged = buildLessonSeedText_({ song, note, evalTxt, progress }, { studentName: student, teacherName: teacher });
+      if (!merged) {
+        merged = `수업명: ${p} / 최근 ${p} 수업 기록을 바탕으로 초보자와 학부모가 궁금해할 수업 방식, 연습 흐름, 자주 막히는 부분을 설명한다.`;
+      }
+
+      pack.text.push(merged);
+      if (song) pack.songs.push(song);
+      if (teacher) pack.teachers.add(teacher);
+      if (student) pack.students.add(student);
+      pack.rowNums.push(cfg.headerRow + 1 + i);
+    } catch (e) {
+      Logger.log(e);
+    }
+  }
+
+  if (!pack.text.length) {
+    pack.text.push(
+      `수업명: ${p} / ${cfg.city} ${p}학원 수업 안내. 초보자가 처음 시작할 때 자주 걱정하는 부분, 수업 진행 방식, 연습 흐름, 학부모 또는 성인 수강생이 궁금해할 내용을 중심으로 작성한다.`
+    );
+  }
+
+  return pack;
+}
+
+function firstFoundColumn_(findFn, names) {
+  for (let i = 0; i < names.length; i++) {
+    const idx = findFn(names[i], false);
+    if (idx >= 0) return idx;
+  }
+  return -1;
+}
+
+function inferPeriodAuto_(rows, cols, tz) {
+  const eligible = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const attendOk = String(r[cols.cAttend] ?? '').trim() === '출석';
+    const song = cols.cSong >= 0 ? String(r[cols.cSong] ?? '').trim() : '';
+    const note = cols.cNote >= 0 ? String(r[cols.cNote] ?? '').trim() : '';
+    const evalT = cols.cEval >= 0 ? String(r[cols.cEval] ?? '').trim() : '';
+    const progress = cols.cProgress >= 0 ? String(r[cols.cProgress] ?? '').trim() : '';
+    if (!attendOk || !(song || note || evalT || progress)) continue;
+
+    const rawDate = r[cols.cDate];
+    const dt = rawDate instanceof Date ? rawDate : new Date(rawDate);
+    if (!isNaN(dt.getTime())) eligible.push(dt);
+  }
+
+  if (!eligible.length) {
+    const end = normalizeDate_(new Date());
+    const start = normalizeDate_(addDays_(end, -27));
+    return { start, end };
+  }
+
+  eligible.sort((a, b) => a - b);
+  if (eligible.length >= 50) {
+    const startIdx = Math.floor(Math.random() * (eligible.length - 50 + 1));
+    const seg = eligible.slice(startIdx, startIdx + 50);
+    return { start: normalizeDate_(seg[0]), end: normalizeDate_(seg[seg.length - 1]) };
+  }
+
+  const end = normalizeDate_(eligible[eligible.length - 1]);
+  const start = normalizeDate_(addDays_(end, -27));
+  return { start, end };
+}
+
+function sanitizeLessonText_(text, opts) {
+  let t = String(text || '').trim();
+  const studentName = String((opts && opts.studentName) || '').trim();
+  const teacherName = String((opts && opts.teacherName) || '').trim();
+
+  if (studentName) {
+    const escapedStudent = studentName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    t = t.replace(new RegExp(escapedStudent, 'g'), '학생');
+  }
+  if (teacherName) {
+    const escapedTeacher = teacherName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    t = t.replace(new RegExp(escapedTeacher, 'g'), '강사');
+  }
+
+  t = t.replace(/[가-힣]{2,4}(학생|님)/g, '학생');
+  t = t.replace(/[가-힣]{2,4}(선생님|쌤)/g, '강사');
+  t = t.replace(/[가-힣]\s?\*/g, '학생');
+  t = t.replace(/[A-Z]\*/g, '학생');
+  t = t.replace(/[ㄱ-ㅎㅏ-ㅣ]{2,}/g, '학생');
+  t = t.replace(/\s{2,}/g, ' ').trim();
+  return t;
+}
+
+function buildLessonSeedText_(lesson, opts) {
+  const parts = [];
+  if (lesson.song) parts.push(`수업곡: ${lesson.song}`);
+  if (lesson.note) parts.push(`수업내용: ${lesson.note}`);
+  if (lesson.evalTxt) parts.push(`레슨평가: ${lesson.evalTxt}`);
+  if (lesson.progress) parts.push(`현재진행상태: ${lesson.progress}`);
+  return sanitizeLessonText_(parts.join(' / '), opts);
+}
+
+/* ========= SEO / CTA / ASSEMBLY ========= */
+function buildSeoHashtags_({ cfg, city, part, song, period, localLabel }) {
+  const local = String(localLabel || '').trim();
+  const base = [
+    '#음악실동경하다',
+    '#실용음악학원',
+    `#${city}실용음악학원`,
+    `#${city}${part}학원`
+  ];
+  const partTags = [`#${city}${part}학원`, `#${part}학원`];
+  const localTags = local ? [
+    `#${local}실용음악학원`.replace(/\s+/g, ''),
+    `#${local}${part}학원`.replace(/\s+/g, '')
+  ] : [];
+  const songTag = song ? [`#${String(song).replace(/\s+/g, '')}`] : [];
+  const all = [...base, ...(cfg.cityHashtags || []), ...partTags, ...localTags, ...songTag];
+  return unique_(all.filter(Boolean)).slice(0, 10);
+}
+
+function trialCTA_(cfg, part) {
+  const p = normalizePart_(part);
+  const bookingUrl = cfg.trialCTA.booking[p] || '';
+  const label = `${p === '음악' ? '음악' : p} 체험 수업`;
+
+  return [
+    '체험 수업 예약',
+    bookingUrl ? `${label}: ${bookingUrl}` : `체험수업 문의: ${cfg.trialCTA.kakaoUrl}`,
+    `네이버 플레이스: ${cfg.trialCTA.mapUrl}`,
+    `카카오 문의: ${cfg.trialCTA.kakaoUrl}`
+  ].join('\n');
+}
+
+function assembleFinal_({ title, part, city, localLabel, thumbnailInfo, photoGuide, uploadFolder, sections, faq, studioIntro, cta, photoCaptions, hashtagsLine }) {
+  const photoLines = buildPhotoPlaceholders_(photoCaptions);
+  const lessonFlow = getLessonFlow_(part);
+  const philosophy = getPhilosophy_();
+  const areaLine = buildAreaCtaLine_(city, localLabel, part);
+
+  return [
+    `# ${title}`,
+    '',
+    '## 썸네일 제작 정보',
+    '',
+    thumbnailInfoToText_(thumbnailInfo),
+    '',
+    '## 본문 사진 추천 조건',
+    '',
+    photoGuideToText_(photoGuide),
+    '',
+    uploadFolderToText_(uploadFolder),
+    '',
+    '---',
+    '',
+    photoLines[0],
+    '',
+    sections.intro,
+    '',
+    '---',
+    '',
+    '## 처음 시작할 때 가장 많이 막히는 부분',
+    '',
+    sections.body,
+    '',
+    photoLines[1],
+    '',
+    '## 자주 묻는 질문',
+    '',
+    faqToNaverText_(faq),
+    '',
+    '---',
+    '',
+    '## 수업은 이렇게 진행됩니다',
+    '',
+    lessonFlow,
+    '',
+    photoLines[2],
+    '',
+    '## 실제 수업 한 장면',
+    '',
+    sections.case,
+    '',
+    '## 동경하다가 수업을 바라보는 방식',
+    '',
+    philosophy,
+    '',
+    studioIntro,
+    '',
+    photoLines[3],
+    '',
+    '## 상담 안내',
+    '',
+    '음악을 처음 시작하는 분들도 괜찮습니다.',
+    '',
+    '지금의 속도에 맞춰 천천히 시작할 수 있도록',
+    '음악실 동경하다에서 함께 안내해드리겠습니다.',
+    '',
+    areaLine,
+    '',
+    cta,
+    '',
+    hashtagsLine
+  ].filter(Boolean).join('\n');
+}
+
+function buildPhotoPlaceholders_(photoCaptions) {
+  const caps = (photoCaptions || []).map(c => String(c || '').trim()).filter(Boolean);
+  const defaults = [
+    '대표 이미지 / 수업실 또는 악기 전체 컷',
+    '손, 악기, 악보 등 클로즈업',
+    '수업 장면 또는 연습 장면',
+    '연습실, 공간, 악기 세팅'
+  ];
+  return defaults.map((fallback, i) => `[사진 ${i + 1}: ${caps[i] || fallback}]`);
+}
+
+function normalizeThumbnailInfo_(info, fallback) {
+  const raw = info && typeof info === 'object' ? info : {};
+  const p = normalizePart_(fallback.part);
+  const titleMain = String(raw.title_main || '').trim() || makeThumbnailMainText_(fallback.title, p);
+  const titleSub = String(raw.title_sub || '').trim() || `${fallback.city} ${p}학원에서 자주 듣는 질문`;
+  return {
+    template_type: String(raw.template_type || '').trim() || pickThumbnailTemplateType_(fallback.target),
+    background_photo: String(raw.background_photo || '').trim() || `${p} 손 클로즈업 / 얼굴 비노출`,
+    title_main: titleMain,
+    title_sub: titleSub,
+    brand_name: String(raw.brand_name || '').trim() || '음악실 동경하다',
+    tone: String(raw.tone || '').trim() || '따뜻함, 차분함, 초보자 친화'
+  };
+}
+
+function thumbnailInfoToText_(info) {
+  if (!info) return '';
+  return [
+    `- Canva 템플릿 유형: ${info.template_type}`,
+    `- 추천 배경 사진: ${info.background_photo}`,
+    `- 메인 문구: ${info.title_main}`,
+    `- 서브 문구: ${info.title_sub}`,
+    `- 브랜드명: ${info.brand_name}`,
+    `- 권장 톤: ${info.tone}`
+  ].join('\n');
+}
+
+function photoGuideToText_(guide) {
+  return (guide || []).map(item => [
+    `[${item.slot}]`,
+    `추천: ${item.recommendation}`
+  ].join('\n')).join('\n\n');
+}
+
+function uploadFolderToText_(uploadFolder) {
+  if (!uploadFolder || !uploadFolder.url) return '';
+  const fileList = (uploadFolder.fileNames || []).length
+    ? '\n\n' + uploadFolder.fileNames.map(name => `- ${name}`).join('\n')
+    : '';
+  return [
+    '## 사진 업로드용 폴더',
+    '',
+    '아래 폴더에 이번 글에 사용할 사진을 모아두었습니다.',
+    uploadFolder.url,
+    fileList
+  ].filter(Boolean).join('\n');
+}
+
+/* ========= PHOTO TAGGING ========= */
+function selectTaggedPhotosForPost_(ss, cfg, part, count) {
+  const sheet = ss.getSheetByName('사진태깅');
+  if (!sheet || sheet.getLastRow() < 2) {
+    Logger.log('사진태깅 탭 없음/빈 시트 → Drive 폴백');
+    return selectDriveImages_(cfg, part, count);
+  }
+
+  const headerMap = getHeaderMap_(sheet);
+  const required = ['지점', '파트', '사진유형', '파일ID', '파일명'];
+  const missing = required.filter(name => !headerMap[name]);
+  if (missing.length) {
+    Logger.log('사진태깅 필수 컬럼 없음: ' + missing.join(', ') + ' → Drive 폴백');
+    return selectDriveImages_(cfg, part, count);
+  }
+
+  ensurePhotoUsageColumnsForBlog_(sheet);
+
+  const map = getHeaderMap_(sheet);
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  const p = normalizePart_(part);
+  const limit = count || 10;
+  const selected = [];
+  const usedIds = {};
+
+  const allCandidates = values.map((row, i) => buildTaggedPhotoObject_(row, map, i + 2))
+    .filter(img => img && img.id)
+    .filter(img => normalizeBranch_(img.branch) === normalizeBranch_(cfg.city))
+    .filter(img => img.part === p || img.part === '공통')
+    .filter(img => !isRejectedPhoto_(img))
+    .sort(compareTaggedPhotoUsage_);
+
+  Logger.log(`사진태깅 후보 수: ${cfg.city} / ${p} = ${allCandidates.length}`);
+
+  if (!allCandidates.length) {
+    Logger.log('사진태깅 후보 0개 → Drive 폴백. 지점/파트 값 확인 필요.');
+    return selectDriveImages_(cfg, part, limit);
+  }
+
+  const plan = buildPhotoPickPlanForPart_(p);
+  plan.forEach(slot => {
+    if (selected.length >= limit) return;
+    const img = pickDiverseTaggedPhoto_(allCandidates, {
+      photoTypes: slot.photoTypes,
+      parts: slot.parts,
+      usedIds: usedIds
+    });
+    if (!img) return;
+    img.slotLabel = slot.label;
+    selected.push(img);
+    usedIds[img.id] = true;
+  });
+
+  if (selected.length < limit) {
+    allCandidates
+      .filter(img => !usedIds[img.id])
+      .sort(compareTaggedPhotoUsage_)
+      .forEach(img => {
+        if (selected.length >= limit) return;
+        img.slotLabel = img.postPosition || img.rawPhotoType || img.photoType || '예비 사진';
+        selected.push(img);
+        usedIds[img.id] = true;
+      });
+  }
+
+  Logger.log(`사진태깅 선택 수: ${cfg.city} / ${p} = ${selected.length}`);
+  return selected.length ? selected : selectDriveImages_(cfg, part, limit);
+}
+
+function buildPhotoPickPlanForPart_(part) {
+  const p = normalizePart_(part);
+
+  const commonSlots = [
+    { label: '공간/연습실', photoTypes: ['공간사진', '공간', '복도_공간', '연습실'], parts: [p, '공통'] },
+    { label: '로비/입구', photoTypes: ['로비_상담', '외관_입구'], parts: ['공통', p] },
+    { label: '합주/공연', photoTypes: ['합주실', '합주&공연'], parts: ['공통', p] },
+    { label: '브랜드/안내', photoTypes: ['브랜드_분위기', '안내문_게시물'], parts: ['공통', p] }
+  ];
+
+  if (p === '보컬') {
+    return [
+      { label: '대표 이미지', photoTypes: ['대표이미지'], parts: [p, '공통'] },
+      { label: '보컬 수업 장면', photoTypes: ['수업장면'], parts: [p] },
+      { label: '발성/마이크', photoTypes: ['발성_마이크', '클로즈업'], parts: [p, '공통'] },
+      { label: '보컬 공간', photoTypes: ['공간사진', '공간', '연습실'], parts: [p, '공통'] },
+      ...commonSlots,
+      { label: '예비 보컬 사진', photoTypes: ['기타'], parts: [p, '공통'] }
+    ];
+  }
+
+  if (p === '피아노') {
+    return [
+      { label: '대표 이미지', photoTypes: ['대표이미지'], parts: [p, '공통'] },
+      { label: '피아노 클로즈업', photoTypes: ['클로즈업'], parts: [p] },
+      { label: '피아노 수업 장면', photoTypes: ['수업장면'], parts: [p] },
+      { label: '피아노 공간', photoTypes: ['공간사진', '공간', '연습실'], parts: [p, '공통'] },
+      ...commonSlots,
+      { label: '예비 피아노 사진', photoTypes: ['기타'], parts: [p, '공통'] }
+    ];
+  }
+
+  if (p === '작곡' || p === '미디') {
+    return [
+      { label: `${p} 대표 이미지`, photoTypes: ['대표이미지'], parts: [p, '공통'] },
+      { label: `${p} 수업 장면`, photoTypes: ['수업장면'], parts: [p] },
+      { label: '교재/커리큘럼', photoTypes: ['교재_커리큘럼', '안내문_게시물'], parts: [p, '공통'] },
+      { label: `${p} 공간`, photoTypes: ['공간사진', '공간', '연습실'], parts: [p, '공통'] },
+      ...commonSlots,
+      { label: `${p} 예비 사진`, photoTypes: ['기타'], parts: [p, '공통'] }
+    ];
+  }
+
+  return [
+    { label: `${p} 대표 이미지`, photoTypes: ['대표이미지'], parts: [p, '공통'] },
+    { label: `${p} 클로즈업`, photoTypes: ['클로즈업'], parts: [p] },
+    { label: `${p} 수업 장면`, photoTypes: ['수업장면'], parts: [p] },
+    { label: `${p} 공간`, photoTypes: ['공간사진', '공간', '연습실'], parts: [p, '공통'] },
+    { label: '교재/커리큘럼', photoTypes: ['교재_커리큘럼', '안내문_게시물'], parts: [p, '공통'] },
+    ...commonSlots,
+    { label: `${p} 예비 사진`, photoTypes: ['기타'], parts: [p, '공통'] }
+  ];
+}
+
+function pickDiverseTaggedPhoto_(candidates, opts) {
+  const partSet = {};
+  (opts.parts || []).forEach(part => {
+    if (part) partSet[normalizePart_(part)] = true;
+  });
+
+  const typeSet = {};
+  (opts.photoTypes || []).forEach(type => {
+    if (type) typeSet[normalizePhotoType_(type)] = true;
+  });
+
+  const filtered = candidates
+    .filter(img => !opts.usedIds[img.id])
+    .filter(img => partSet[img.part])
+    .filter(img => typeSet[img.photoType])
+    .sort(compareTaggedPhotoUsage_);
+
+  return filtered[0] || null;
+}
+
+function buildTaggedPhotoObject_(row, map, rowNumber) {
+  const get = name => map[name] ? String(row[map[name] - 1] || '').trim() : '';
+  const id = get('파일ID');
+  if (!id) return null;
+
+  const fileName = get('파일명') || '사진';
+  return {
+    id: id,
+    title: fileName,
+    url: `https://drive.google.com/file/d/${id}/view`,
+    branch: get('지점'),
+    part: normalizePart_(get('파트')),
+    rawPhotoType: get('사진유형'),
+    photoType: normalizePhotoType_(get('사진유형')),
+    core: get('핵심내용'),
+    exposure: get('노출상태'),
+    imageType: get('이미지유형'),
+    seoKeyword: get('추천SEO키워드'),
+    postPosition: get('추천_글내위치'),
+    reviewNeeded: get('검수필요'),
+    memo: get('비고'),
+    photoContext: extractPhotoContextFromFileName_(fileName),
+    rowNumber: rowNumber,
+    recommendedCount: map['추천횟수'] ? Number(row[map['추천횟수'] - 1] || 0) : 0,
+    lastRecommendedAt: map['마지막추천일'] ? row[map['마지막추천일'] - 1] : ''
+  };
+}
+
+function normalizePhotoType_(type) {
+  const t = String(type || '').trim();
+  if (t === '공간') return '공간사진';
+  return t;
+}
+
+function normalizeBranch_(value) {
+  return String(value || '')
+    .replace(/점$/g, '')
+    .replace(/\s+/g, '')
+    .trim();
+}
+
+function isRejectedPhoto_(img) {
+  const hay = [img.rawPhotoType, img.core, img.exposure, img.imageType, img.reviewNeeded, img.memo].join(' ');
+  return /휴지통|삭제|사용금지/i.test(hay);
+}
+
+function extractPhotoContextFromFileName_(fileName) {
+  return String(fileName || '')
+    .replace(/\.[^.]+$/, '')
+    .replace(/IMG[_-]?\d+/gi, '')
+    .replace(/KakaoTalk_\d+_\d+/gi, '')
+    .replace(/^\d+[_\-\s]*/, '')
+    .replace(/[_\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function formatPhotoTagsForPrompt_(images) {
+  const arr = images || [];
+  if (!arr.length) return '- 없음';
+
+  return arr.map((img, i) => {
+    return [
+      `사진 ${i + 1}`,
+      img.slotLabel ? `추천슬롯: ${img.slotLabel}` : '',
+      `사진유형: ${img.rawPhotoType || img.photoType || '미지정'}`,
+      img.core ? `핵심내용: ${img.core}` : '',
+      img.exposure ? `노출상태: ${img.exposure}` : '',
+      img.imageType ? `이미지유형: ${img.imageType}` : '',
+      img.seoKeyword ? `추천SEO키워드: ${img.seoKeyword}` : '',
+      img.postPosition ? `추천_글내위치: ${img.postPosition}` : '',
+      img.reviewNeeded ? `검수필요: ${img.reviewNeeded}` : '',
+      `파일명해석: ${img.photoContext || img.title || ''}`,
+      `원본파일명: ${img.title || ''}`,
+      `지점: ${img.branch || ''}`,
+      `파트: ${img.part || ''}`,
+      img.memo ? `비고: ${img.memo}` : '',
+      `추천횟수: ${img.recommendedCount || 0}`
+    ].filter(Boolean).join(' / ');
+  }).join('\n');
+}
+
+function compareTaggedPhotoUsage_(a, b) {
+  if (a.recommendedCount !== b.recommendedCount) {
+    return a.recommendedCount - b.recommendedCount;
+  }
+  const ad = a.lastRecommendedAt instanceof Date ? a.lastRecommendedAt.getTime() : 0;
+  const bd = b.lastRecommendedAt instanceof Date ? b.lastRecommendedAt.getTime() : 0;
+  return ad - bd;
+}
+
+function markTaggedPhotosUsed_(ss, images, postTitle, tz) {
+  if (!images || !images.length) return;
+
+  const sheet = ss.getSheetByName('사진태깅');
+  if (!sheet) return;
+
+  ensurePhotoUsageColumnsForBlog_(sheet);
+  const map = getHeaderMap_(sheet);
+  const now = new Date();
+
+  images.forEach(img => {
+    if (!img.rowNumber || !map['추천횟수']) return;
+
+    const countCell = sheet.getRange(img.rowNumber, map['추천횟수']);
+    const current = Number(countCell.getValue() || 0);
+    countCell.setValue(isNaN(current) ? 1 : current + 1);
+
+    if (map['마지막추천일']) {
+      sheet.getRange(img.rowNumber, map['마지막추천일'])
+        .setValue(now)
+        .setNumberFormat('yyyy-mm-dd hh:mm');
+    }
+    if (map['마지막추천글']) {
+      sheet.getRange(img.rowNumber, map['마지막추천글']).setValue(postTitle || '');
+    }
+  });
+}
+
+function ensurePhotoUsageColumnsForBlog_(sheet) {
+  const needed = ['추천횟수', '마지막추천일', '마지막추천글'];
+  const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  needed.forEach(name => {
+    if (header.indexOf(name) === -1) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(name);
+      header.push(name);
+    }
+  });
+}
+
+function buildPhotoRecommendationGuide_(cfg, part, selectedImages) {
+  const images = selectedImages || [];
+
+  if (!images.length) {
+    return [{
+      slot: '사진 추천',
+      recommendation: `${cfg.city} / ${normalizePart_(part)} 사진 후보가 없습니다. 사진태깅 탭을 확인해 주세요.`
+    }];
+  }
+
+  return images.map((img, i) => {
+    return {
+      slot: `사진 ${i + 1}: ${img.slotLabel || img.rawPhotoType || img.photoType || '추천 사진'}`,
+      recommendation: [
+        `사진유형: ${img.rawPhotoType || img.photoType || '미지정'}`,
+        img.core ? `핵심내용: ${img.core}` : '',
+        img.exposure ? `노출상태: ${img.exposure}` : '',
+        img.imageType ? `이미지유형: ${img.imageType}` : '',
+        img.seoKeyword ? `추천SEO키워드: ${img.seoKeyword}` : '',
+        img.postPosition ? `추천_글내위치: ${img.postPosition}` : '',
+        img.reviewNeeded ? `검수필요: ${img.reviewNeeded}` : '',
+        `파일명해석: ${img.photoContext || img.title}`,
+        img.memo ? `비고: ${img.memo}` : '',
+        `지점/파트: ${img.branch || cfg.city} / ${img.part || normalizePart_(part)}`,
+        `원본파일명: ${img.title}`,
+        img.url
+      ].filter(Boolean).join('\n')
+    };
+  });
+}
+
+/* ========= DRIVE ========= */
+function selectDriveImages_(cfg, part, count) {
+  try {
+    if (!cfg.imageRootFolderId) return [];
+    const root = DriveApp.getFolderById(cfg.imageRootFolderId);
+    const branchFolder = findChildFolderByName_(root, `${cfg.city}점`) || findChildFolderByName_(root, cfg.city);
+    if (!branchFolder) return [];
+
+    const p = normalizePart_(part);
+    const folders = [
+      findChildFolderByName_(branchFolder, p),
+      findChildFolderByName_(branchFolder, '공통')
+    ].filter(Boolean);
+
+    let images = [];
+    folders.forEach(folder => {
+      images = images.concat(listImageFilesInFolder_(folder, cfg.city, p));
+    });
+
+    if (!images.length) images = listImageFilesInFolder_(branchFolder, cfg.city, p);
+    return images.slice(0, count || 10);
+  } catch (e) {
+    Logger.log('Drive 이미지 추천 실패: ' + e);
+    return [];
+  }
+}
+
+function createUploadImageFolder_(cfg, part, images, meta) {
+  const empty = { url: '', fileNames: [] };
+  try {
+    if (!cfg.imageRootFolderId) {
+      Logger.log('업로드용 사진 폴더 생성 스킵: imageRootFolderId 없음');
+      return empty;
+    }
+    if (!images || !images.length) {
+      Logger.log('업로드용 사진 폴더 생성 스킵: selectedImages 없음');
+      return empty;
+    }
+
+    const root = DriveApp.getFolderById(cfg.imageRootFolderId);
+    const uploadRoot = getOrCreateChildFolder_(root, '블로그용사진');
+    const folderName = makeUploadFolderName_(cfg, part, meta);
+    const folder = uploadRoot.createFolder(folderName);
+    const fileNames = [];
+
+    images.forEach((img, i) => {
+      try {
+        const file = DriveApp.getFileById(img.id);
+        const copied = file.makeCopy(makeUploadImageFileName_(i, img.title), folder);
+        fileNames.push(copied.getName());
+      } catch (e) {
+        Logger.log(`업로드용 사진 복사 실패: ${img.title} / ${img.id} / ${e}`);
+      }
+    });
+
+    return { url: folder.getUrl(), fileNames: fileNames };
+  } catch (e) {
+    Logger.log('업로드용 사진 폴더 생성 실패: ' + e);
+    return empty;
+  }
+}
+
+function getOrCreateChildFolder_(parent, name) {
+  const existing = parent.getFoldersByName(name);
+  return existing.hasNext() ? existing.next() : parent.createFolder(name);
+}
+
+function makeUploadFolderName_(cfg, part, meta) {
+  const date = Utilities.formatDate((meta && meta.date) || new Date(), (meta && meta.timezone) || cfg.timezone, 'yyyy-MM-dd');
+  const title = sanitizeDriveName_((meta && meta.title) || '');
+  const shortTitle = title ? title.slice(0, 28) : '블로그글';
+  return `${date}_${cfg.city}_${normalizePart_(part)}_${shortTitle}`;
+}
+
+function makeUploadImageFileName_(index, originalName) {
+  const labels = ['대표', '클로즈업', '수업장면', '공간', '교재', '연습실', '합주실', '로비', '브랜드', '기타'];
+  const n = String(index + 1).padStart(2, '0');
+  const label = labels[index] || '사진';
+  return `${n}_${label}_${sanitizeDriveName_(originalName || 'image')}`;
+}
+
+function sanitizeDriveName_(name) {
+  return String(name || '')
+    .replace(/[\\/:*?"<>|#%{}~&]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function findChildFolderByName_(parent, name) {
+  const folders = parent.getFoldersByName(name);
+  return folders.hasNext() ? folders.next() : null;
+}
+
+function listImageFilesInFolder_(folder, branch, part) {
+  const files = folder.getFiles();
+  const out = [];
+  while (files.hasNext()) {
+    const file = files.next();
+    const mime = String(file.getMimeType() || '');
+    if (!mime.match(/^image\//)) continue;
+    out.push({
+      id: file.getId(),
+      title: file.getName(),
+      url: file.getUrl(),
+      branch: branch,
+      part: part
+    });
+  }
+  out.sort((a, b) => a.title.localeCompare(b.title));
+  return out;
+}
+
+/* ========= DOC EXPORT ========= */
+function menuExportSelectedToDocs() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  const row = sheet.getActiveRange().getRow();
+  if (row < 2) {
+    SpreadsheetApp.getUi().alert('결과 시트에서 내보낼 데이터 행을 먼저 선택하세요.');
+    return;
+  }
+  exportRowToGoogleDocs_(sheet, row);
+}
+
+function exportRowToGoogleDocs_(sheet, row) {
+  const headerMap = getHeaderMap_(sheet);
+  const get = name => {
+    const c = headerMap[name];
+    return c ? String(sheet.getRange(row, c).getValue() || '').trim() : '';
+  };
+
+  const title = get('제목') || '제목 없음';
+  const part = get('파트/악기') || '음악';
+  const intro = get('섹션-도입');
+  const body = get('섹션-본문');
+  const caseTxt = get('섹션-사례');
+  const studioIntro = get('섹션-학원소개');
+  const cta = get('섹션-CTA');
+  const hashtags = get('해시태그').replace(/,/g, ' ');
+  const photoCapsRaw = get('사진캡션(CSV)');
+  const thumbnailInfoText = get('썸네일_제작정보');
+  const photoGuideText = get('사진추천_조건');
+  const uploadFolderUrl = get('업로드용_사진폴더');
+  const uploadPhotoList = get('업로드용_사진목록');
+  const imageUrls = get('이미지_URLs').split('|').map(s => s.trim()).filter(Boolean);
+  const photos = buildPhotoPlaceholders_(photoCapsRaw ? photoCapsRaw.split('|') : []);
+  const lessonFlow = getLessonFlow_(part);
+  const philosophy = getPhilosophy_();
+
+  let faq = [];
+  try {
+    faq = JSON.parse(get('FAQ_JSON') || '[]');
+  } catch (e) {
+    faq = [];
+  }
+
+  const doc = DocumentApp.create(`[블로그] ${title}`);
+  const b = doc.getBody();
+  b.clear();
+
+  appendHeading_(b, title, DocumentApp.ParagraphHeading.HEADING1);
+  if (thumbnailInfoText) {
+    appendHeading_(b, '썸네일 제작 정보', DocumentApp.ParagraphHeading.HEADING2);
+    appendInfoBox_(b, thumbnailInfoText);
+  }
+  if (photoGuideText) {
+    appendHeading_(b, '본문 사진 추천 조건', DocumentApp.ParagraphHeading.HEADING2);
+    appendInfoBox_(b, photoGuideText);
+  }
+  if (uploadFolderUrl) {
+    appendHeading_(b, '사진 업로드용 폴더', DocumentApp.ParagraphHeading.HEADING2);
+    appendUploadFolderLink_(b, uploadFolderUrl);
+    if (uploadPhotoList) appendInfoBox_(b, uploadPhotoList);
+  }
+  b.appendHorizontalRule();
+
+  appendPhotoBox_(b, photos[0]);
+  appendDriveImageBlock_(b, imageUrls[0]);
+  appendItalicParagraph_(b, intro);
+  b.appendHorizontalRule();
+
+  appendHeading_(b, '처음 시작할 때 가장 많이 막히는 부분', DocumentApp.ParagraphHeading.HEADING2);
+  appendParagraph_(b, body);
+  appendPhotoBox_(b, photos[1]);
+  appendDriveImageBlock_(b, imageUrls[1]);
+
+  appendHeading_(b, '자주 묻는 질문', DocumentApp.ParagraphHeading.HEADING2);
+  faq.forEach((item, i) => {
+    const q = appendParagraph_(b, `Q${i + 1}. ${item.q}`);
+    q.editAsText().setBold(true).setForegroundColor(DOC_STYLE.colorAccent);
+    appendParagraph_(b, `A. ${item.a}`);
+    b.appendParagraph('');
+  });
+
+  b.appendHorizontalRule();
+  appendHeading_(b, '수업은 이렇게 진행됩니다', DocumentApp.ParagraphHeading.HEADING2);
+  appendParagraph_(b, lessonFlow);
+  appendPhotoBox_(b, photos[2]);
+  appendDriveImageBlock_(b, imageUrls[2]);
+
+  appendHeading_(b, '실제 수업 한 장면', DocumentApp.ParagraphHeading.HEADING2);
+  appendParagraph_(b, caseTxt);
+
+  appendHeading_(b, '동경하다가 수업을 바라보는 방식', DocumentApp.ParagraphHeading.HEADING2);
+  appendParagraph_(b, philosophy);
+  appendParagraph_(b, studioIntro);
+  appendPhotoBox_(b, photos[3]);
+  appendDriveImageBlock_(b, imageUrls[3]);
+
+  appendHeading_(b, '상담 안내', DocumentApp.ParagraphHeading.HEADING2);
+  appendParagraph_(b, '음악을 처음 시작하는 분들도 괜찮습니다.\n\n지금의 속도에 맞춰 천천히 시작할 수 있도록\n음악실 동경하다에서 함께 안내해드리겠습니다.');
+  cta.split('\n').forEach(line => {
+    if (line.trim()) appendParagraph_(b, line.trim());
+  });
+
+  if (hashtags) {
+    b.appendParagraph('');
+    const tagPara = appendParagraph_(b, hashtags);
+    tagPara.editAsText().setForegroundColor('#888888');
+  }
+
+  doc.saveAndClose();
+  const url = doc.getUrl();
+  if (headerMap['발행URL']) sheet.getRange(row, headerMap['발행URL']).setValue(url);
+
+  SpreadsheetApp.getUi().showModalDialog(
+    HtmlService.createHtmlOutput(
+      `<div style="font-family:sans-serif;padding:12px;line-height:1.6">
+        <p><b>Google Docs 생성 완료</b></p>
+        <p><a href="${url}" target="_blank">${escapeHtml_(title)}</a></p>
+        <p style="color:#666;font-size:13px">
+          문서를 열고 전체 선택 후 복사해서 네이버 블로그 에디터에 붙여넣으세요.<br>
+          제목, 소제목, 굵은 질문, 회색 해시태그 스타일이 함께 옮겨갑니다.
+        </p>
+      </div>`
+    ).setWidth(440).setHeight(220),
+    '내보내기 완료'
+  );
+}
+
+function appendHeading_(body, text, heading) {
+  if (!text) return null;
+  const p = body.appendParagraph(text).setHeading(heading);
+  const isH1 = heading === DocumentApp.ParagraphHeading.HEADING1;
+  p.editAsText()
+    .setFontFamily(DOC_STYLE.fontHeading)
+    .setForegroundColor(DOC_STYLE.colorHeading)
+    .setBold(true)
+    .setFontSize(isH1 ? DOC_STYLE.sizeH1 : DOC_STYLE.sizeH2);
+  p.setSpacingBefore(isH1 ? 0 : 8).setSpacingAfter(6);
+  return p;
+}
+
+function appendParagraph_(body, text) {
+  const p = body.appendParagraph(String(text || ''));
+  p.editAsText()
+    .setFontFamily(DOC_STYLE.fontBody)
+    .setForegroundColor(DOC_STYLE.colorBody)
+    .setFontSize(DOC_STYLE.sizeBody);
+  p.setLineSpacing(1.5);
+  return p;
+}
+
+function appendItalicParagraph_(body, text) {
+  const p = appendParagraph_(body, text);
+  if (text) p.editAsText().setItalic(true);
+  return p;
+}
+
+function appendPhotoBox_(body, text) {
+  const p = body.appendParagraph(String(text || ''));
+  p.editAsText()
+    .setFontFamily(DOC_STYLE.fontBody)
+    .setFontSize(DOC_STYLE.sizeBody)
+    .setForegroundColor('#999999')
+    .setItalic(true);
+  return p;
+}
+
+function appendDriveImageBlock_(body, url) {
+  if (!url) return null;
+  return appendImageUrlLine_(body, url);
+}
+
+function appendImageUrlLine_(body, url) {
+  if (!url) return null;
+  const p = body.appendParagraph('Drive 사진 링크: 사진 열기');
+  const text = p.editAsText();
+  text
+    .setFontFamily(DOC_STYLE.fontBody)
+    .setFontSize(9)
+    .setForegroundColor('#999999');
+  text.setLinkUrl('Drive 사진 링크: '.length, 'Drive 사진 링크: 사진 열기'.length - 1, url);
+  return p;
+}
+
+function appendUploadFolderLink_(body, url) {
+  if (!url) return null;
+  const p = body.appendParagraph('네이버 업로드용 사진 폴더: 폴더 열기');
+  const text = p.editAsText();
+  text
+    .setFontFamily(DOC_STYLE.fontBody)
+    .setFontSize(DOC_STYLE.sizeBody)
+    .setForegroundColor(DOC_STYLE.colorAccent)
+    .setBold(true);
+  text.setLinkUrl('네이버 업로드용 사진 폴더: '.length, '네이버 업로드용 사진 폴더: 폴더 열기'.length - 1, url);
+  return p;
+}
+
+function appendInfoBox_(body, text) {
+  const p = body.appendParagraph(String(text || ''));
+  p.editAsText()
+    .setFontFamily(DOC_STYLE.fontBody)
+    .setFontSize(DOC_STYLE.sizeBody)
+    .setForegroundColor('#6B5B4D');
+  p.setLineSpacing(1.4);
+  return p;
+}
+
+function escapeHtml_(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/* ========= MISC ========= */
+function getCfg_(branchKey) {
+  const cfg = CONFIG[branchKey];
+  if (!cfg) throw new Error(`CONFIG.${branchKey}가 없습니다.`);
+  return cfg;
+}
+
+function openSourceSpreadsheet_(cfg) {
+  if (cfg.sourceSpreadsheetId) return SpreadsheetApp.openById(cfg.sourceSpreadsheetId);
+  const active = SpreadsheetApp.getActive();
+  if (!active) throw new Error(`${cfg.branchKey}.sourceSpreadsheetId를 입력해야 standalone 트리거에서 출석부를 읽을 수 있습니다.`);
+  return active;
+}
+
+function getNextPartRotation_(cfg) {
+  const i = getAndBumpCounter_(`PART_ROT_IDX_${cfg.branchKey}`, cfg.partRotation.length);
+  return cfg.partRotation[i];
+}
+
+function pickLocalLabel_(cfg) {
+  const pool = cfg.localLabels || [cfg.city + ' '];
+  const idx = getAndBumpCounter_(`CITY_ROT_IDX_${cfg.branchKey}`, pool.length);
+  return pool[idx];
+}
+
+function pickTarget_() {
+  const arr = ['초등', '중고등', '성인', '직장인', '초보자'];
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function normalizePart_(txt) {
+  const t = String(txt || '');
+  if (/공통/.test(t)) return '공통';
+  if (/베이스/i.test(t)) return '베이스기타';
+  if (/(일렉\s*기타|일렉기타|통\s*기타|통기타|Electric\s*Guitar|Acoustic\s*Guitar|기타)/i.test(t)) return '기타';
+  if (/성인\s*피아노|피아노/i.test(t)) return '피아노';
+  if (/드럼/i.test(t)) return '드럼';
+  if (/보컬|발성|노래/i.test(t)) return '보컬';
+  if (/작곡/i.test(t)) return '작곡';
+  if (/미디|MIDI|DAW/i.test(t)) return '미디';
+  return '음악';
+}
+
+function buildTargetGuide_(target) {
+  const map = {
+    '초등': '초등학생 또는 학부모가 공감할 수 있는 시작 시기, 흥미, 성장 포인트를 반영하라.',
+    '중고등': '중고등학생이 공감할 수 있는 실력 변화, 집중, 수행평가/입시/취미 확장 가능성을 반영하라.',
+    '성인': '성인이 공감할 수 있는 취미 시작, 자기만의 시간, 성취감의 흐름을 반영하라.',
+    '직장인': '직장인이 공감할 수 있는 퇴근 후 취미, 불규칙한 스케줄, 꾸준히 다니기 좋은 구조를 반영하라.',
+    '초보자': '완전 초보자가 공감할 수 있는 처음 시작의 부담, 기초, 천천히 배우는 과정, 작은 변화의 즐거움을 반영하라.'
+  };
+  return map[target] || map['초보자'];
+}
+
+function getAndBumpCounter_(key, modulo) {
+  const sp = PropertiesService.getScriptProperties();
+  let n = Number(sp.getProperty(key) || '0');
+  const out = n % modulo;
+  sp.setProperty(key, String((n + 1) % 1000000));
+  return out;
+}
+
+function cleanupTitle_(title, local, part) {
+  let t = String(title || '').trim();
+  const localClean = String(local || '').trim();
+  const partClean = String(part || '').trim();
+  const wordsToRemove = [
+    `${localClean}${partClean}학원`,
+    `${localClean} ${partClean}학원`,
+    `${partClean}학원`,
+    `${partClean}레슨`,
+    localClean,
+    '학원',
+    '레슨'
+  ].filter(Boolean);
+
+  wordsToRemove.forEach(word => {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    t = t.replace(new RegExp(escaped, 'gi'), ' ');
+  });
+
+  t = t.replace(/\s{2,}/g, ' ').replace(/^[:\-–—,.\s]+/, '').trim();
+  if (!t) t = `${partClean} 초보도 시작할 수 있는 수업 후기`;
+  return t;
+}
+
+function normalizeDate_(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function addDays_(d, n) {
+  const x = new Date(d.getTime());
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function parseDate_(s, tz, msg) {
+  const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) throw new Error(msg || '날짜 형식 오류');
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (isNaN(d.getTime())) throw new Error(msg || '날짜 파싱 실패');
+  return d;
+}
+
+function genPostId_(part, now, tz) {
+  const stamp = Utilities.formatDate(now, tz, 'yyyyMMddHHmmss');
+  const p = (part || '음악').replace(/\s+/g, '');
+  return `${stamp}-${p}`;
+}
+
+function safeNotify_(msg) {
+  try {
+    SpreadsheetApp.getUi().alert(msg);
+  } catch (e) {
+    Logger.log(msg);
+  }
+}
+
+function scoreTeacherLine_(s) {
+  let sc = 0;
+  if (!s) return 0;
+  sc += Math.min(60, s.length / 2);
+  if (/\d/.test(s)) sc += 10;
+  if (/bpm|메트로놈|루프|녹음|템포|타임|리듬|필인|뮤트|호흡|피치|코드|스트로크|합주|DAW|화성학/i.test(s)) sc += 25;
+  if (/집중|흥미|성장|자신감|빠르|안정|연결|표현|소통|발성|소리/i.test(s)) sc += 20;
+  return sc;
+}
+
+function unique_(arr) {
+  return [...new Set((arr || []).filter(Boolean))];
+}
+
+function pickThumbnailTemplateType_(target) {
+  if (/초등|초보/.test(String(target || ''))) return 'Q&A형';
+  if (/성인|직장인/.test(String(target || ''))) return '수업안내형';
+  return '성장기록형';
+}
+
+function makeThumbnailMainText_(title, part) {
+  const t = String(title || '').replace(/^#\s*/, '').trim();
+  if (t.length <= 18) return t;
+  if (t.includes('?')) return t.split('?')[0].slice(0, 18) + '?';
+  return `처음 배우는 ${part}, 괜찮을까요?`;
+}
+
+function faqToNaverText_(faq) {
+  return (faq || []).map(item => [
+    `**Q. ${item.q}**`,
+    `A. ${item.a}`
+  ].join('\n')).join('\n\n');
+}
+
+function getLessonFlow_(part) {
+  const p = normalizePart_(part);
+  const flows = {
+    '드럼': ['기본 박자 확인', '손과 발의 움직임 분리', '간단한 리듬 패턴 연습', '곡에 적용', '다음 연습 방향 정리'],
+    '보컬': ['목소리 상태 확인', '호흡과 발성 체크', '곡의 어려운 구간 확인', '표현과 발음 피드백', '다음 연습 방향 정리'],
+    '기타': ['손 모양과 코드 확인', '스트로크 리듬 연습', '코드 전환 연습', '곡에 적용', '다음 연습 방향 정리'],
+    '베이스기타': ['손 모양과 기본 포지션 확인', '리듬과 루트 진행 연습', '박자 안에서 음 연결', '곡 또는 합주 패턴에 적용', '다음 연습 방향 정리'],
+    '피아노': ['손 위치와 자세 확인', '양손 연결 연습', '리듬과 악보 확인', '곡에 적용', '다음 연습 방향 정리'],
+    '작곡': ['아이디어와 목표 확인', '멜로디 또는 코드 진행 정리', '구간별 구성 확인', 'DAW 또는 악보에 적용', '다음 작업 방향 정리'],
+    '미디': ['작업 목표와 장비 확인', 'DAW 기본 흐름 확인', '리듬/코드/사운드 배치', '짧은 구간 제작', '다음 작업 방향 정리']
+  };
+  const arr = flows[p] || ['현재 상태 확인', '기본 움직임 연습', '쉬운 곡 또는 패턴에 적용', '짧은 피드백', '다음 연습 방향 정리'];
+  return arr.map((x, i) => `${['①','②','③','④','⑤'][i]} ${x}`).join('\n');
+}
+
+function getPhilosophy_() {
+  return [
+    '수업은 설명을 많이 듣는 시간이 아니라,',
+    '직접 해보고 다시 확인하는 시간에 가까워야 합니다.',
+    '',
+    '음악실 동경하다는 학생이 스스로',
+    '어디에서 막히는지 알 수 있도록',
+    '수업 안에서 작은 기준을 함께 만들어갑니다.'
+  ].join('\n');
+}
+
+function buildAreaCtaLine_(city, localLabel, part) {
+  const local = String(localLabel || '').trim();
+  if (city === '수원') return `수원 영통구청 인근에서 ${part} 수업을 찾고 계신 분들은 편하게 문의 주세요.`;
+  if (city === '안양') return `안양 동안구 권역에서 ${part} 수업을 찾고 계신 분들은 편하게 문의 주세요.`;
+  return `${local || city}에서 ${part} 수업을 찾고 계신 분들은 편하게 문의 주세요.`;
+}
