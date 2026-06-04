@@ -22,7 +22,7 @@ const CONFIG = {
     scheduleDefault: '',
     model: 'claude-sonnet-4-5',
     temperature: 0.75,
-    max_tokens: 1800,
+    max_tokens: 4000,
     partRotation: ['기타', '베이스기타', '드럼', '피아노'],
     localLabels: ['비산동 ', '평촌 ', '범계 ', '관양동 ', '호계동 ', '인덕원 '],
     cityHashtags: [
@@ -57,7 +57,7 @@ const CONFIG = {
     scheduleDefault: '',
     model: 'claude-sonnet-4-5',
     temperature: 0.75,
-    max_tokens: 1800,
+    max_tokens: 4000,
     partRotation: ['기타', '베이스기타', '드럼', '피아노', '보컬', '작곡', '미디'],
     localLabels: ['수원 ', '영통 ', '매탄동 ', '권선동 ', '인계동 ', '세류동 ', '광교 ', '매교동 ', '매탄권선역 ', '영통구청 '],
     cityHashtags: [
