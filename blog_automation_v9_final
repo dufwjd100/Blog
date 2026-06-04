@@ -383,6 +383,7 @@ function generateWithClaude_V9_(cfg, part, textList, meta) {
     '목표: AI와 검색이 인용하기 쉬운 질문형/FAQ형/수업사례형 블로그 글을 꾸준히 생성한다.',
     '톤: 따뜻하고 담백하게. 과장 없이 정보와 사실을 1~2개 이상 포함한다.',
     '금지어: 최고, 1등, 무조건, 보장, 100%',
+    'JSON 문자열 값 안에 큰따옴표(")를 절대 쓰지 마라. 대화나 인용 표현은 반드시 「」 또는 \'\'를 사용하라. 예: "곡은 왜 끊기죠?" → 「곡은 왜 끊기죠?」',
     '학생/강사의 실명, 성, 이름, 초성, 이니셜, 마스킹명은 제목/본문/FAQ/사진캡션 어디에도 절대 쓰지 않는다.',
     '학생을 지칭할 때는 반드시 "한 학생", "한 초등학생", "한 성인 수강생", "한 수강생" 같은 비식별 표현만 쓴다.',
     '여러 출석부 행을 묶은 주간 요약형 글이므로 특정 학생 개인의 후기처럼 쓰지 않는다.',
@@ -481,7 +482,6 @@ function generateWithClaude_V9_(cfg, part, textList, meta) {
 
   const json = JSON.parse(res.getContentText());
   Logger.log('Claude 응답 stop_reason: ' + (json.stop_reason || '없음'));
-  Logger.log('Claude usage: ' + JSON.stringify(json.usage || {}));
   const raw = stripJsonFences_(extractClaudeText_(json).trim());
   Logger.log('파싱 시도 raw (앞 400자): ' + raw.slice(0, 400));
   try {
@@ -489,9 +489,54 @@ function generateWithClaude_V9_(cfg, part, textList, meta) {
     Logger.log('JSON 파싱 성공. title: ' + (parsed.title || '없음') + ' / faq 수: ' + (Array.isArray(parsed.faq) ? parsed.faq.length : '없음'));
     return parsed;
   } catch (e) {
-    Logger.log('JSON 파싱 실패: ' + e + ' / raw 전체: ' + raw.slice(0, 800));
-    return { error: 'JSON 파싱 실패: ' + e + ' / raw: ' + raw.slice(0, 300) };
+    const fixed = repairJsonQuotes_(raw);
+    try {
+      const parsed = JSON.parse(fixed);
+      Logger.log('JSON 복구 후 파싱 성공');
+      return parsed;
+    } catch (e2) {
+      Logger.log('JSON 파싱 실패: ' + e + ' / raw: ' + raw.slice(0, 400));
+      return { error: 'JSON 파싱 실패: ' + e + ' / raw: ' + raw.slice(0, 300) };
+    }
   }
+}
+
+function repairJsonQuotes_(raw) {
+  // JSON 문자열 값 안의 이스케이프되지 않은 큰따옴표를 「」로 교체
+  let result = '';
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (escaped) {
+      result += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      result += ch;
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      if (!inString) {
+        inString = true;
+        result += ch;
+      } else {
+        // 다음이 : } ] , \n 이면 문자열 끝으로 판단
+        const next = raw[i + 1] || '';
+        if (/[\s]*[:,\}\]]/.test(raw.slice(i + 1, i + 4)) || next === '') {
+          inString = false;
+          result += ch;
+        } else {
+          result += '「';
+        }
+      }
+      continue;
+    }
+    result += ch;
+  }
+  return result;
 }
 
 function stripJsonFences_(text) {
