@@ -480,10 +480,16 @@ function generateWithClaude_V9_(cfg, part, textList, meta) {
   }
 
   const json = JSON.parse(res.getContentText());
+  Logger.log('Claude 응답 stop_reason: ' + (json.stop_reason || '없음'));
+  Logger.log('Claude usage: ' + JSON.stringify(json.usage || {}));
   const raw = stripJsonFences_(extractClaudeText_(json).trim());
+  Logger.log('파싱 시도 raw (앞 400자): ' + raw.slice(0, 400));
   try {
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    Logger.log('JSON 파싱 성공. title: ' + (parsed.title || '없음') + ' / faq 수: ' + (Array.isArray(parsed.faq) ? parsed.faq.length : '없음'));
+    return parsed;
   } catch (e) {
+    Logger.log('JSON 파싱 실패: ' + e + ' / raw 전체: ' + raw.slice(0, 800));
     return { error: 'JSON 파싱 실패: ' + e + ' / raw: ' + raw.slice(0, 300) };
   }
 }
